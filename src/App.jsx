@@ -19,14 +19,12 @@ export default function App() {
   const [error, setError] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
 
-  // Load scan count from localStorage
   useEffect(() => {
     const key = getTodayKey()
     const saved = parseInt(localStorage.getItem(key) || '0')
     setScansToday(saved)
   }, [])
 
-  // Listen for auth changes
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
@@ -43,19 +41,17 @@ export default function App() {
   }, [])
 
   async function checkSubscription(email) {
-    const res = await fetch('/api/check-subscription', {
-
-
-
-
-
-
-
-      method: 'POST',
-      body: JSON.stringify({ email })
-    })
-    const data = await res.json()
-    setIsPro(data.isPro)
+    try {
+      const res = await fetch('/api/check-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      })
+      const data = await res.json()
+      setIsPro(data.isPro)
+    } catch (err) {
+      console.error('Subscription check failed:', err)
+    }
   }
 
   async function signInWithGoogle() {
@@ -96,7 +92,6 @@ export default function App() {
   async function analyze() {
     if (!image) return
 
-    // Check scan limit for free users
     if (!isPro) {
       const key = getTodayKey()
       const count = parseInt(localStorage.getItem(key) || '0')
@@ -113,30 +108,59 @@ export default function App() {
       const reader = new FileReader()
       reader.readAsDataURL(image)
       reader.onload = async () => {
-        const base64 = reader.result.replace(/^data:image\/\w+;base64,/, '')
+        try {
+          const base64 = reader.result.replace(/^data:image\/\w+;base64,/, '')
 
-        const res = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: base64 })
-        })
+          const res = await fetch('/api/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-6',
+              max_tokens: 1024,
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    {
+                      type: 'image',
+                      source: {
+                        type: 'base64',
+                        media_type: 'image/jpeg',
+                        data: base64
+                      }
+                    },
+                    {
+                      type: 'text',
+                      text: 'You are a thrift store reselling expert. Identify this item and return ONLY a JSON object with these fields: item (string), flipScore (0-100 integer), lowPrice (number), avgPrice (number), highPrice (number), platforms (array of strings), tips (array of 2-3 strings). No markdown, no explanation, just the JSON object.'
+                    }
+                  ]
+                }
+              ]
+            })
+          })
 
-        const data = await res.json()
-        if (data.error) throw new Error(data.error)
+          const data = await res.json()
+          if (data.error) throw new Error(JSON.stringify(data.error))
 
-        setResult(data)
+          const text = data.content[0].text
+          const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
+          setResult(parsed)
 
-        // Increment scan count for free users
-        if (!isPro) {
-          const key = getTodayKey()
-          const newCount = parseInt(localStorage.getItem(key) || '0') + 1
-          localStorage.setItem(key, newCount)
-          setScansToday(newCount)
+          if (!isPro) {
+            const key = getTodayKey()
+            const newCount = parseInt(localStorage.getItem(key) || '0') + 1
+            localStorage.setItem(key, newCount)
+            setScansToday(newCount)
+          }
+        } catch (err) {
+          setError('Something went wrong. Please try again.')
+          console.error(err)
+        } finally {
+          setLoading(false)
         }
       }
     } catch (err) {
       setError('Something went wrong. Please try again.')
-    } finally {
       setLoading(false)
     }
   }
@@ -160,7 +184,6 @@ export default function App() {
 
   return (
     <div style={styles.container}>
-      {/* Header */}
       <div style={styles.header}>
         <img src="/logo.svg" alt="The Thrifty Magpie" style={styles.logo} />
         <h1 style={styles.title}>The Thrifty Magpie</h1>
@@ -172,13 +195,12 @@ export default function App() {
           </div>
         ) : (
           <button onClick={signInWithGoogle} style={styles.googleBtn}>
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width={18} style={{marginRight:8}} />
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width={18} style={{ marginRight: 8 }} />
             Sign in with Google
           </button>
         )}
       </div>
 
-      {/* Scan counter */}
       {!isPro && (
         <div style={styles.scanBar}>
           {user
@@ -187,12 +209,11 @@ export default function App() {
         </div>
       )}
       {isPro && (
-        <div style={{...styles.scanBar, background: '#f0fdf4', color: '#16a34a'}}>
+        <div style={{ ...styles.scanBar, background: '#f0fdf4', color: '#16a34a' }}>
           ✨ Pro — unlimited scans
         </div>
       )}
 
-      {/* Main card */}
       <div style={styles.card}>
         {!result ? (
           <>
@@ -201,18 +222,18 @@ export default function App() {
                 ? <img src={preview} alt="preview" style={styles.preview} />
                 : (
                   <div style={styles.uploadPlaceholder}>
-                    <div style={{fontSize:48}}>📷</div>
-                    <div style={{marginTop:12, fontWeight:600}}>Tap to take or upload a photo</div>
-                    <div style={{marginTop:6, color:'#888', fontSize:14}}>Any thrift store item</div>
+                    <div style={{ fontSize: 48 }}>📷</div>
+                    <div style={{ marginTop: 12, fontWeight: 600 }}>Tap to take or upload a photo</div>
+                    <div style={{ marginTop: 6, color: '#888', fontSize: 14 }}>Any thrift store item</div>
                   </div>
                 )}
-              <input type="file" accept="image/*" onChange={handleImage} style={{display:'none'}} />
+              <input type="file" accept="image/*" onChange={handleImage} style={{ display: 'none' }} />
             </label>
 
             {error === 'limit' && (
               <div style={styles.limitBox}>
-                <div style={{fontWeight:700, marginBottom:8}}>You've used your 5 free scans today!</div>
-                <div style={{marginBottom:16, color:'#555', fontSize:14}}>Upgrade to Pro for unlimited scans.</div>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>You've used your 5 free scans today!</div>
+                <div style={{ marginBottom: 16, color: '#555', fontSize: 14 }}>Upgrade to Pro for unlimited scans.</div>
                 <a href={STRIPE_LINK} style={styles.upgradeBtn}>Upgrade to Pro — $4.99/month</a>
               </div>
             )}
@@ -248,9 +269,9 @@ export default function App() {
                 <div style={styles.priceLabel}>Avg</div>
                 <div style={styles.priceVal}>${result.avgPrice}</div>
               </div>
-              <div style={{...styles.priceBox, background:'#f0fdf4'}}>
+              <div style={{ ...styles.priceBox, background: '#f0fdf4' }}>
                 <div style={styles.priceLabel}>High</div>
-                <div style={{...styles.priceVal, color:'#16a34a'}}>${result.highPrice}</div>
+                <div style={{ ...styles.priceVal, color: '#16a34a' }}>${result.highPrice}</div>
               </div>
             </div>
 
@@ -276,35 +297,35 @@ export default function App() {
 
 const styles = {
   container: { maxWidth: 480, margin: '0 auto', padding: '0 16px 40px', fontFamily: 'system-ui, sans-serif' },
-  centered: { display:'flex', justifyContent:'center', alignItems:'center', height:'100vh' },
+  centered: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' },
   header: { textAlign: 'center', padding: '24px 0 8px' },
   logo: { width: 64, height: 64, marginBottom: 8 },
   title: { fontSize: 24, fontWeight: 800, margin: '0 0 12px', color: '#1a1a1a' },
-  userBar: { display:'flex', alignItems:'center', justifyContent:'center', gap:8, flexWrap:'wrap', marginBottom:8 },
-  userEmail: { fontSize:13, color:'#555' },
-  proBadge: { background:'#16a34a', color:'#fff', fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:99 },
-  signOutBtn: { fontSize:13, color:'#888', background:'none', border:'1px solid #ddd', borderRadius:8, padding:'4px 10px', cursor:'pointer' },
-  googleBtn: { display:'inline-flex', alignItems:'center', background:'#fff', border:'1px solid #ddd', borderRadius:10, padding:'10px 20px', fontSize:15, fontWeight:600, cursor:'pointer', boxShadow:'0 1px 4px rgba(0,0,0,0.08)' },
-  scanBar: { textAlign:'center', fontSize:13, color:'#888', background:'#f9f9f9', borderRadius:10, padding:'8px 16px', marginBottom:16 },
-  card: { background:'#fff', borderRadius:20, boxShadow:'0 2px 16px rgba(0,0,0,0.08)', padding:20 },
-  uploadArea: { display:'block', cursor:'pointer', border:'2px dashed #e5e5e5', borderRadius:16, overflow:'hidden', marginBottom:16, minHeight:200, display:'flex', alignItems:'center', justifyContent:'center' },
-  uploadPlaceholder: { textAlign:'center', padding:32 },
-  preview: { width:'100%', borderRadius:14, display:'block' },
-  analyzeBtn: { width:'100%', background:'#7c3aed', color:'#fff', border:'none', borderRadius:14, padding:'16px', fontSize:17, fontWeight:700, cursor:'pointer' },
-  limitBox: { background:'#fff7ed', border:'1px solid #fed7aa', borderRadius:14, padding:20, textAlign:'center', marginBottom:16 },
-  upgradeBtn: { display:'inline-block', background:'#f97316', color:'#fff', fontWeight:700, borderRadius:12, padding:'12px 24px', textDecoration:'none', fontSize:15 },
-  errorBox: { background:'#fef2f2', border:'1px solid #fca5a5', borderRadius:12, padding:14, color:'#dc2626', marginBottom:16, fontSize:14 },
-  resultHeader: { display:'flex', gap:14, alignItems:'center', marginBottom:16 },
-  resultThumb: { width:72, height:72, borderRadius:12, objectFit:'cover' },
-  itemName: { fontSize:18, fontWeight:800, marginBottom:4 },
-  flipScore: (score) => ({ fontSize:13, fontWeight:600, color: score >= 70 ? '#16a34a' : score >= 40 ? '#d97706' : '#dc2626' }),
-  priceRow: { display:'flex', gap:10, marginBottom:16 },
-  priceBox: { flex:1, background:'#f9f9f9', borderRadius:12, padding:'12px 8px', textAlign:'center' },
-  priceLabel: { fontSize:11, color:'#888', marginBottom:4, textTransform:'uppercase', letterSpacing:1 },
-  priceVal: { fontSize:20, fontWeight:800 },
-  sectionTitle: { fontSize:13, fontWeight:700, textTransform:'uppercase', letterSpacing:1, color:'#888', marginBottom:8, marginTop:16 },
-  platforms: { display:'flex', flexWrap:'wrap', gap:8, marginBottom:8 },
-  platformTag: { background:'#f0f0ff', color:'#7c3aed', borderRadius:99, padding:'4px 12px', fontSize:13, fontWeight:600 },
-  tip: { fontSize:14, color:'#444', marginBottom:6, lineHeight:1.5 },
-  resetBtn: { width:'100%', marginTop:20, background:'#f3f4f6', border:'none', borderRadius:14, padding:14, fontSize:16, fontWeight:600, cursor:'pointer' }
+  userBar: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 },
+  userEmail: { fontSize: 13, color: '#555' },
+  proBadge: { background: '#16a34a', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 },
+  signOutBtn: { fontSize: 13, color: '#888', background: 'none', border: '1px solid #ddd', borderRadius: 8, padding: '4px 10px', cursor: 'pointer' },
+  googleBtn: { display: 'inline-flex', alignItems: 'center', background: '#fff', border: '1px solid #ddd', borderRadius: 10, padding: '10px 20px', fontSize: 15, fontWeight: 600, cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' },
+  scanBar: { textAlign: 'center', fontSize: 13, color: '#888', background: '#f9f9f9', borderRadius: 10, padding: '8px 16px', marginBottom: 16 },
+  card: { background: '#fff', borderRadius: 20, boxShadow: '0 2px 16px rgba(0,0,0,0.08)', padding: 20 },
+  uploadArea: { display: 'flex', cursor: 'pointer', border: '2px dashed #e5e5e5', borderRadius: 16, overflow: 'hidden', marginBottom: 16, minHeight: 200, alignItems: 'center', justifyContent: 'center' },
+  uploadPlaceholder: { textAlign: 'center', padding: 32 },
+  preview: { width: '100%', borderRadius: 14, display: 'block' },
+  analyzeBtn: { width: '100%', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 14, padding: '16px', fontSize: 17, fontWeight: 700, cursor: 'pointer' },
+  limitBox: { background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 14, padding: 20, textAlign: 'center', marginBottom: 16 },
+  upgradeBtn: { display: 'inline-block', background: '#f97316', color: '#fff', fontWeight: 700, borderRadius: 12, padding: '12px 24px', textDecoration: 'none', fontSize: 15 },
+  errorBox: { background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 12, padding: 14, color: '#dc2626', marginBottom: 16, fontSize: 14 },
+  resultHeader: { display: 'flex', gap: 14, alignItems: 'center', marginBottom: 16 },
+  resultThumb: { width: 72, height: 72, borderRadius: 12, objectFit: 'cover' },
+  itemName: { fontSize: 18, fontWeight: 800, marginBottom: 4 },
+  flipScore: (score) => ({ fontSize: 13, fontWeight: 600, color: score >= 70 ? '#16a34a' : score >= 40 ? '#d97706' : '#dc2626' }),
+  priceRow: { display: 'flex', gap: 10, marginBottom: 16 },
+  priceBox: { flex: 1, background: '#f9f9f9', borderRadius: 12, padding: '12px 8px', textAlign: 'center' },
+  priceLabel: { fontSize: 11, color: '#888', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 },
+  priceVal: { fontSize: 20, fontWeight: 800 },
+  sectionTitle: { fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#888', marginBottom: 8, marginTop: 16 },
+  platforms: { display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  platformTag: { background: '#f0f0ff', color: '#7c3aed', borderRadius: 99, padding: '4px 12px', fontSize: 13, fontWeight: 600 },
+  tip: { fontSize: 14, color: '#444', marginBottom: 6, lineHeight: 1.5 },
+  resetBtn: { width: '100%', marginTop: 20, background: '#f3f4f6', border: 'none', borderRadius: 14, padding: 14, fontSize: 16, fontWeight: 600, cursor: 'pointer' }
 }

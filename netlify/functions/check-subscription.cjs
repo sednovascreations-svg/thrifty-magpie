@@ -6,10 +6,19 @@ const supabase = createClient(
 )
 
 exports.handler = async (event) => {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*'
+  }
+
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers }
+  }
+
   const { email } = JSON.parse(event.body || '{}')
 
   if (!email) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Email required' }) }
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Email required' }) }
   }
 
   const { data } = await supabase
@@ -20,6 +29,7 @@ exports.handler = async (event) => {
 
   return {
     statusCode: 200,
+    headers,
     body: JSON.stringify({ isPro: data?.active === true })
   }
 }

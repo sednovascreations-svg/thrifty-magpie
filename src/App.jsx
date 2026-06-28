@@ -43,7 +43,14 @@ export default function App() {
   }, [])
 
   async function checkSubscription(email) {
-    const res = await fetch('/.netlify/functions/check-subscription', {
+    const res = await fetch('/api/check-subscription', {
+
+
+
+
+
+
+
       method: 'POST',
       body: JSON.stringify({ email })
     })
@@ -108,7 +115,7 @@ export default function App() {
       reader.onload = async () => {
         const base64 = reader.result.replace(/^data:image\/\w+;base64,/, '')
 
-        const res = await fetch('/.netlify/functions/analyze', {
+        const res = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: base64 })

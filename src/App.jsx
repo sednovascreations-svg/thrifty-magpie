@@ -300,7 +300,7 @@ const styles = {
   container: { maxWidth: 480, margin: '0 auto', padding: '0 16px 40px', fontFamily: 'system-ui, sans-serif' },
   centered: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' },
   header: { textAlign: 'center', padding: '24px 0 8px' },
-  logo: { width: 190, height: 190, marginBottom: 8 },
+  logo: { width: 400, height: 400, marginBottom: 8 },
   title: { fontSize: 24, fontWeight: 800, margin: '0 0 12px', color: '#1a1a1a' },
   userBar: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 },
   userEmail: { fontSize: 13, color: '#555' },

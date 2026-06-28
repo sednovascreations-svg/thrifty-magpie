@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 
-const STRIPE_LINK = 'https://buy.stripe.com/cNiaEX9ev1JS5jBbIe2kw00'
+const STRIPE_LINK = 'https://buy.stripe.com/3cIbJ1aZ75uV3G45Jh3cc00'
 const DAILY_FREE_LIMIT = 5
 
 function getTodayKey() {
